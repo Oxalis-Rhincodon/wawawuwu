@@ -13,7 +13,7 @@ COLORS = {
     "grey": 0x95A5A6,
 }
 
-# key -> (channel name, topic). Every key gets its own log channel.
+
 LOG_TYPES = {
     "joins": ("join-leave-logs", "Members joining and leaving"),
     "members": ("member-logs", "Nickname, role, username, avatar and timeout changes, plus autoroles"),

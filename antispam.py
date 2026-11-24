@@ -25,7 +25,10 @@ CREATE TABLE IF NOT EXISTS antispam_config (
     dup_seconds     INTEGER NOT NULL DEFAULT 20,
     max_mentions    INTEGER NOT NULL DEFAULT 5,
     block_invites   INTEGER NOT NULL DEFAULT 0,
-    timeout_minutes INTEGER NOT NULL DEFAULT 10
+    timeout_minutes INTEGER NOT NULL DEFAULT 10,
+    caps_enabled    INTEGER NOT NULL DEFAULT 1,
+    caps_percent    INTEGER NOT NULL DEFAULT 70,
+    caps_min_letters INTEGER NOT NULL DEFAULT 8
 );
 CREATE TABLE IF NOT EXISTS antispam_ignored (
     guild_id   INTEGER NOT NULL,
@@ -43,8 +46,19 @@ DEFAULTS = {
     "max_mentions": 5,
     "block_invites": 0,
     "timeout_minutes": 10,
+    "caps_enabled": 1,
+    "caps_percent": 70,
+    "caps_min_letters": 8,
 }
 
+# Columns added after the first version. Added automatically to older databases.
+NEW_COLUMNS = {
+    "caps_enabled": "INTEGER NOT NULL DEFAULT 1",
+    "caps_percent": "INTEGER NOT NULL DEFAULT 70",
+    "caps_min_letters": "INTEGER NOT NULL DEFAULT 8",
+}
+
+CLEAN_RE = re.compile(r"<[^>]+>|https?://\S+")  # mentions, custom emoji and links don't count as caps
 INVITE_RE = re.compile(r"(?:discord\.gg|discord(?:app)?\.com/invite)/[\w-]+", re.I)
 STRIKE_RESET_SECONDS = 300   # strikes are forgotten after 5 quiet minutes
 COOLDOWN_SECONDS = 3         # right after a punishment, extra spam is just deleted
@@ -60,6 +74,11 @@ class AntiSpam(commands.Cog):
 
     async def cog_load(self):
         await self.bot.db.conn.executescript(SCHEMA)
+        cur = await self.bot.db.conn.execute("PRAGMA table_info(antispam_config)")
+        existing = {r["name"] for r in await cur.fetchall()}
+        for column, declaration in NEW_COLUMNS.items():
+            if column not in existing:
+                await self.bot.db.conn.execute(f"ALTER TABLE antispam_config ADD COLUMN {column} {declaration}")
         await self.bot.db.conn.commit()
 
     # ----------------------------------------------------------------- config
@@ -76,6 +95,7 @@ class AntiSpam(commands.Cog):
         cfg["ignored"] = {r["channel_id"] for r in await cur.fetchall()}
         cfg["enabled"] = bool(cfg["enabled"])
         cfg["block_invites"] = bool(cfg["block_invites"])
+        cfg["caps_enabled"] = bool(cfg["caps_enabled"])
         self.configs[guild_id] = cfg
         return cfg
 
@@ -95,6 +115,14 @@ class AntiSpam(commands.Cog):
     def _normalise(content: str) -> str:
         return " ".join(content.lower().split())
 
+    @staticmethod
+    def _too_many_caps(content: str, cfg: dict) -> bool:
+        letters = [c for c in CLEAN_RE.sub("", content) if c.isalpha()]
+        if len(letters) < cfg["caps_min_letters"]:
+            return False
+        upper = sum(1 for c in letters if c.isupper())
+        return upper * 100 / len(letters) >= cfg["caps_percent"]
+
     def check_message(self, message: discord.Message, cfg: dict, now: float):
         """Returns (reason, messages_to_delete, strikes_to_add) or None."""
         key = (message.guild.id, message.author.id)
@@ -106,6 +134,9 @@ class AntiSpam(commands.Cog):
 
         if cfg["block_invites"] and INVITE_RE.search(message.content or ""):
             return "posting invite links", [message], 1
+
+        if cfg["caps_enabled"] and self._too_many_caps(message.content or "", cfg):
+            return "using too many capital letters", [message], 0.5
 
         recent = [m for t, m in history if now - t <= cfg["per_seconds"]]
         if len(recent) >= cfg["max_messages"]:
@@ -157,8 +188,9 @@ class AntiSpam(commands.Cog):
         reason, to_delete, add_strikes = result
 
         # Set these before any await so a second message can't trigger a second punishment.
-        self.cooldown_until[key] = now + COOLDOWN_SECONDS
-        self.history.pop(key, None)
+        if add_strikes >= 1:
+            self.cooldown_until[key] = now + COOLDOWN_SECONDS
+            self.history.pop(key, None)
         count, last = self.strikes.get(key, (0, 0.0))
         if now - last > STRIKE_RESET_SECONDS:
             count = 0
@@ -194,6 +226,8 @@ class AntiSpam(commands.Cog):
             except (discord.Forbidden, discord.HTTPException):
                 pass
             notice = f"🔇 {member.mention} was timed out for {minutes} minute(s) for {reason}."
+        elif "capital" in reason:
+            notice = f"⚠️ {member.mention}, please don't use so many capital letters."
         else:
             notice = f"⚠️ {member.mention}, please slow down. You were caught {reason}."
 
@@ -208,7 +242,7 @@ class AntiSpam(commands.Cog):
         embed.add_field(name="Reason", value=reason)
         embed.add_field(name="Messages deleted", value=str(deleted))
         embed.add_field(name="Channel", value=message.channel.mention)
-        embed.add_field(name="Strikes", value=str(strikes))
+        embed.add_field(name="Strikes", value=f"{strikes:g}")
         if message.content:
             embed.add_field(name="Last message", value=truncate(message.content, 500), inline=False)
         await self.bot.send_log(guild, "moderation", embed)
@@ -235,6 +269,9 @@ class AntiSpam(commands.Cog):
         max_mentions="Mentions in a single message that count as mass-mentioning (default 5)",
         block_invites="Delete Discord invite links from non-staff (default off)",
         timeout_minutes="How long a repeat offender is timed out, in minutes (default 10)",
+        caps_filter="Delete messages with too many capital letters (default on)",
+        caps_percent="Percent of letters that must be capitals to count (default 70)",
+        caps_min_letters="Messages with fewer letters than this are never checked (default 8)",
     )
     async def config(
         self,
@@ -246,6 +283,9 @@ class AntiSpam(commands.Cog):
         max_mentions: Optional[app_commands.Range[int, 3, 30]] = None,
         block_invites: Optional[bool] = None,
         timeout_minutes: Optional[app_commands.Range[int, 1, 10080]] = None,
+        caps_filter: Optional[bool] = None,
+        caps_percent: Optional[app_commands.Range[int, 40, 100]] = None,
+        caps_min_letters: Optional[app_commands.Range[int, 4, 50]] = None,
     ):
         changes = {
             "max_messages": max_messages,
@@ -255,6 +295,9 @@ class AntiSpam(commands.Cog):
             "max_mentions": max_mentions,
             "block_invites": block_invites,
             "timeout_minutes": timeout_minutes,
+            "caps_enabled": caps_filter,
+            "caps_percent": caps_percent,
+            "caps_min_letters": caps_min_letters,
         }
         changes = {k: v for k, v in changes.items() if v is not None}
         if not changes:
@@ -295,12 +338,17 @@ class AntiSpam(commands.Cog):
         embed.add_field(name="Repeats", value=f"{cfg['dup_count']} identical messages in {cfg['dup_seconds']}s")
         embed.add_field(name="Mass mentions", value=f"{cfg['max_mentions']}+ mentions in one message")
         embed.add_field(name="Invite links", value="Deleted" if cfg["block_invites"] else "Allowed")
+        if cfg["caps_enabled"]:
+            caps = f"Deleted at {cfg['caps_percent']}%+ capitals (messages with {cfg['caps_min_letters']}+ letters)"
+        else:
+            caps = "Allowed"
+        embed.add_field(name="Too many caps", value=caps)
         embed.add_field(name="Repeat offenders", value=f"Timed out for {cfg['timeout_minutes']} min")
         ignored = " ".join(f"<#{c}>" for c in cfg["ignored"]) or "*none*"
         embed.add_field(name="Ignored channels", value=ignored, inline=False)
         embed.set_footer(
-            text="1st strike: messages deleted + warning. 2nd strike: timeout. Mass mentions go straight to a timeout. "
-            "Staff and anyone with Manage Messages are exempt."
+            text="Spam: 1st strike = messages deleted + warning, 2nd = timeout. Mass mentions go straight to a timeout. "
+            "Caps count as half a strike. Staff and anyone with Manage Messages are exempt."
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
 

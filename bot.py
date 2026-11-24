@@ -20,8 +20,8 @@ EXTENSIONS = ("logs", "moderation", "autorole", "staff", "tickets", "antispam")
 class ModBot(commands.Bot):
     def __init__(self):
         intents = discord.Intents.default()
-        intents.members = True          # privileged: enable in the developer portal
-        intents.message_content = True  # privileged: enable in the developer portal
+        intents.members = True         
+        intents.message_content = True  
         super().__init__(command_prefix=commands.when_mentioned, intents=intents, help_command=None)
         self.db = Database()
         self.perms = PermissionManager(self.db)
@@ -35,13 +35,13 @@ class ModBot(commands.Bot):
         dev_guild = (os.getenv("DEV_GUILD_ID") or "").strip()
         try:
             if dev_guild.isdigit():
-                # Guild sync is instant, handy while testing.
+                
                 guild = discord.Object(id=int(dev_guild))
                 self.tree.copy_global_to(guild=guild)
                 synced = await self.tree.sync(guild=guild)
                 log.info("Synced %d command(s) to dev guild %s", len(synced), dev_guild)
             else:
-                # Global sync can take a little while to show up in Discord.
+                
                 synced = await self.tree.sync()
                 log.info("Synced %d global command(s)", len(synced))
         except discord.HTTPException:

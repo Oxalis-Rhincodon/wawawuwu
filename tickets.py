@@ -16,7 +16,7 @@ log = logging.getLogger("modbot.tickets")
 
 MAX_OPEN_PER_USER = 2
 
-# key -> (label, emoji, blurb)
+
 TICKET_TYPES = {
     "support": ("Support", "🎫", "Get help from the staff team"),
     "report": ("Report", "🚨", "Report a member or an incident"),
@@ -286,7 +286,7 @@ class Tickets(commands.Cog):
             guild, "tickets", embed, file=discord.File(io.BytesIO(transcript), filename=filename)
         )
 
-        # DM the opener a copy of the transcript (if their DMs are open).
+       
         opener = guild.get_member(ticket["user_id"])
         if opener:
             dm = make_embed(f"Your ticket in {guild.name} was closed", COLORS["red"])

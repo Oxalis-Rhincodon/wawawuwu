@@ -14,7 +14,7 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("modbot")
 
-EXTENSIONS = ("logs", "moderation", "autorole", "staff", "tickets")
+EXTENSIONS = ("logs", "moderation", "autorole", "staff", "tickets", "antispam")
 
 
 class ModBot(commands.Bot):

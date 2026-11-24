@@ -15,7 +15,7 @@ from discord import app_commands
 TRIAL, MOD, ADMIN = 1, 2, 3
 TIER_NAMES = {0: "Everyone", TRIAL: "Trial Mod", MOD: "Mod", ADMIN: "Admin"}
 
-# Which tier each command needs by default. Admins can change these with /permissions command.
+
 COMMAND_DEFAULTS = {
     "warn": TRIAL,
     "history": TRIAL,
@@ -44,7 +44,7 @@ COMMAND_LABELS = {
     "removecase": "/removecase",
 }
 
-# Commands that are always Admin only and can't be changed (so nobody can lock themselves out).
+
 FIXED_ADMIN_LABELS = [
     "/permissions",
     "/setup_logs",
@@ -54,9 +54,9 @@ FIXED_ADMIN_LABELS = [
     "/ticket panel",
 ]
 
-# Longest timeout each tier may hand out.
+
 TIMEOUT_CAPS = {
-    TRIAL: timedelta(hours=1),
+    TRIAL: timedelta(days=2),
     MOD: timedelta(days=7),
     ADMIN: timedelta(days=28),
 }

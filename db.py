@@ -4,7 +4,7 @@ from typing import Optional
 
 import aiosqlite
 
-# Uses DB_PATH if set; otherwise stores the DB on the Railway volume when one is attached.
+
 DB_PATH = os.getenv("DB_PATH") or os.path.join(os.getenv("RAILWAY_VOLUME_MOUNT_PATH", "."), "modbot.db")
 
 SCHEMA = """

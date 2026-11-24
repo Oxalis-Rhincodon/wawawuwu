@@ -51,17 +51,17 @@ DEFAULTS = {
     "caps_min_letters": 8,
 }
 
-# Columns added after the first version. Added automatically to older databases.
+
 NEW_COLUMNS = {
     "caps_enabled": "INTEGER NOT NULL DEFAULT 1",
     "caps_percent": "INTEGER NOT NULL DEFAULT 70",
     "caps_min_letters": "INTEGER NOT NULL DEFAULT 8",
 }
 
-CLEAN_RE = re.compile(r"<[^>]+>|https?://\S+")  # mentions, custom emoji and links don't count as caps
+CLEAN_RE = re.compile(r"<[^>]+>|https?://\S+")  
 INVITE_RE = re.compile(r"(?:discord\.gg|discord(?:app)?\.com/invite)/[\w-]+", re.I)
-STRIKE_RESET_SECONDS = 300   # strikes are forgotten after 5 quiet minutes
-COOLDOWN_SECONDS = 3         # right after a punishment, extra spam is just deleted
+STRIKE_RESET_SECONDS = 300   
+COOLDOWN_SECONDS = 3       
 
 
 class AntiSpam(commands.Cog):
@@ -103,14 +103,14 @@ class AntiSpam(commands.Cog):
         await self.bot.db.conn.execute("INSERT OR IGNORE INTO antispam_config (guild_id) VALUES (?)", (guild_id,))
         for key, value in fields.items():
             if key not in DEFAULTS:
-                continue  # only known columns ever reach the SQL
+                continue  
             await self.bot.db.conn.execute(
                 f"UPDATE antispam_config SET {key} = ? WHERE guild_id = ?", (int(value), guild_id)
             )
         await self.bot.db.conn.commit()
         self.configs.pop(guild_id, None)
 
-    # --------------------------------------------------------------- detection
+  
     @staticmethod
     def _normalise(content: str) -> str:
         return " ".join(content.lower().split())
@@ -177,7 +177,7 @@ class AntiSpam(commands.Cog):
         now = time.monotonic()
         key = (message.guild.id, member.id)
 
-        # Right after a punishment, quietly delete whatever else they fire off.
+       
         if now < self.cooldown_until.get(key, 0):
             await self.delete_messages([message])
             return
@@ -187,7 +187,7 @@ class AntiSpam(commands.Cog):
             return
         reason, to_delete, add_strikes = result
 
-        # Set these before any await so a second message can't trigger a second punishment.
+      
         if add_strikes >= 1:
             self.cooldown_until[key] = now + COOLDOWN_SECONDS
             self.history.pop(key, None)

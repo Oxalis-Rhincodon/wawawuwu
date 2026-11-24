@@ -421,7 +421,7 @@ class Logs(commands.Cog):
     async def on_member_ban(self, guild: discord.Guild, user: discord.User):
         actor, reason = await audit_actor(guild, discord.AuditLogAction.ban, user.id)
         if actor and actor.id == self.bot.user.id:
-            return  # already logged by the /ban or /tempban command
+            return  
         embed = make_embed("Member banned (manual)", COLORS["red"])
         embed.add_field(name="User", value=who(user))
         embed.add_field(name="Moderator", value=who(actor) if actor else "*unknown*")

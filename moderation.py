@@ -421,7 +421,7 @@ class Moderation(commands.Cog):
             try:
                 await guild.unban(discord.Object(id=row["user_id"]), reason=f"Tempban expired (case #{row['id']})")
             except discord.NotFound:
-                pass  # already unbanned
+                pass  
             except discord.HTTPException:
                 log.exception("Failed to auto-unban %s in %s", row["user_id"], guild.id)
                 continue

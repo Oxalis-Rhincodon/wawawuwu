@@ -16,6 +16,27 @@ log = logging.getLogger("modbot")
 
 EXTENSIONS = ("logs", "moderation", "autorole", "staff", "tickets", "antispam")
 
+# Hides each command from members who lack this Discord permission (staff still need the matching
+# staff group to actually use it). Admins can show a command to more roles in
+# Server Settings > Integrations > your bot.
+COMMAND_VISIBILITY = {
+    "warn": discord.Permissions(moderate_members=True),
+    "history": discord.Permissions(moderate_members=True),
+    "timeout": discord.Permissions(moderate_members=True),
+    "untimeout": discord.Permissions(moderate_members=True),
+    "ticket": discord.Permissions(moderate_members=True),
+    "kick": discord.Permissions(kick_members=True),
+    "ban": discord.Permissions(ban_members=True),
+    "tempban": discord.Permissions(ban_members=True),
+    "unban": discord.Permissions(ban_members=True),
+    "purge": discord.Permissions(manage_messages=True),
+    "removecase": discord.Permissions(manage_guild=True),
+    "permissions": discord.Permissions(manage_guild=True),
+    "setup_logs": discord.Permissions(manage_guild=True),
+    "setlog": discord.Permissions(manage_guild=True),
+    "autorole": discord.Permissions(manage_guild=True),
+    "antispam": discord.Permissions(manage_guild=True),
+}
 
 class ModBot(commands.Bot):
     def __init__(self):
@@ -31,7 +52,13 @@ class ModBot(commands.Bot):
         await self.db.connect()
         for ext in EXTENSIONS:
             await self.load_extension(ext)
+            
+        for command in self.tree.get_commands():
+            visible_to = COMMAND_VISIBILITY.get(command.name)
+            if visible_to is not None:
+                command.default_permissions = visible_to
 
+        
         dev_guild = (os.getenv("DEV_GUILD_ID") or "").strip()
         try:
             if dev_guild.isdigit():

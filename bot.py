@@ -14,7 +14,7 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("modbot")
 
-EXTENSIONS = ("logs", "moderation", "autorole", "staff", "tickets", "antispam")
+EXTENSIONS = ("logs", "moderation", "autorole", "staff", "tickets")
 
 # Hides each command from members who lack this Discord permission (staff still need the matching
 # staff group to actually use it). Admins can show a command to more roles in
@@ -35,7 +35,6 @@ COMMAND_VISIBILITY = {
     "setup_logs": discord.Permissions(manage_guild=True),
     "setlog": discord.Permissions(manage_guild=True),
     "autorole": discord.Permissions(manage_guild=True),
-    "antispam": discord.Permissions(manage_guild=True),
 }
 
 class ModBot(commands.Bot):
